@@ -1,3 +1,5 @@
+<!-- START OF FILE index (4).html -->
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -65,12 +67,10 @@
         #player { width: 50px; height: 70px; position: absolute; display: flex; flex-direction: column; align-items: center; user-select: none; transition: box-shadow 0.3s; z-index: 15; }
         .power-up-effect { box-shadow: 0 0 25px 10px #ffd700; border-radius: 50%; }
         
-        /* [수정] 머리: z-index 5 */
         .player-head { width: 50px; height: 50px; background-color: #ffdbac; border: 2px solid #000; border-radius: 50%; position: relative; transition: transform 0.1s; z-index: 5; }
         
         .player-body { width: 30px; height: 20px; background-color: #007bff; border: 2px solid #000; border-bottom: none; z-index: 4; }
         
-        /* [수정] 모자: z-index 20 (머리보다 앞으로) */
         #green-hat { width: 55px; height: 20px; background-color: #28a745; border: 2px solid #000; border-radius: 10px 10px 0 0; position: absolute; top: -10px; z-index: 20; }
         
         /* 보스용 모자 스타일 */
@@ -101,6 +101,13 @@
         .health-bar-bg { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 100%; height: 8px; background-color: #555; border-radius: 4px; border: 1px solid #000; }
         .health-bar-fill { width: 100%; height: 100%; background-color: #dc3545; border-radius: 4px; transition: width 0.2s; }
         .summon-hp { background-color: #ffaa00; }
+
+        /* [수정] 구민상 보스 전용 체력바 위치 조정 (모자에 가림 방지) */
+        .boss-minsang .health-bar-bg {
+            top: -55px !important; /* 모자 높이 고려하여 위로 이동 */
+            width: 120%;
+            z-index: 30; /* 모자보다 앞으로 */
+        }
         
         /* Melee Attack FX */
         .melee-attack-fx { position: absolute; width: 240px; height: 240px; border: 4px solid rgba(255, 255, 255, 0.7); border-radius: 50%; transform: translate(-50%, -50%); animation: melee-fx 0.2s forwards; pointer-events: none; }
@@ -152,7 +159,6 @@
         }
 
         #player-victory {
-            /* [수정] 마진 확보 (글자 가림 방지) */
             margin: 100px auto 100px auto; 
             box-shadow: 0 0 50px rgba(76, 175, 80, 0.5); 
             border-radius: 50%;
@@ -658,6 +664,9 @@ function spawnBoss(bossId, isSummon = false) {
         options.lastMiniSummon = 0;
         // 구민상은 초록 모자를 쓰고 나옴
         options.html = '<div class="boss-hat"></div>';
+        
+        // [수정] 구민상 전용 클래스 추가 (체력바 위치 CSS 적용을 위해)
+        options.class += ' boss-minsang';
     }
 
     const bossEntity = createEntity(options);
