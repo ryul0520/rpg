@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>빼앗긴 초록 모자를 찾아서</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nanum+Gothic+Coding:wght@700&display=swap');
+        body { font-family: 'Nanum Gothic Coding', monospace; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #1a1a1a; color: #f0f0f0; }
+        #game-wrapper { width: 1200px; text-align: center; }
+        h1 { color: #4CAF50; text-shadow: 2px 2px #000; font-size: 28px; }
+        #game-container { border: 5px solid #555; box-shadow: 0 0 20px rgba(0,0,0,0.7); width: 1200px; height: 800px; position: relative; background-color: #333; overflow: hidden; }
+        .screen { position: absolute; width: 100%; height: 100%; top: 0; left: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; transition: opacity 0.5s; opacity: 1; z-index: 10; }
+        .hidden { opacity: 0; pointer-events: none; }
+        button { font-family: 'Nanum Gothic Coding', monospace; padding: 10px 20px; font-size: 18px; background-color: #4CAF50; border: 2px solid #2e8b57; border-radius: 10px; cursor: pointer; color: white; transition: all 0.2s; }
+        button:hover:not(:disabled) { background-color: #5cb85c; transform: translateY(-3px); }
+        button:disabled { background-color: #555; color: #888; cursor: not-allowed; border-color: #444; }
+
+        /* Intro, Lobby, Upgrade, Game Over Screens */
+        #intro-screen, #game-over-screen, #game-won-screen, #boss-cleared-screen, #lobby-screen, #upgrade-screen { background: #2a2a2a; }
+        #intro-screen, #game-over-screen, #game-won-screen, #boss-cleared-screen { background-color: #000; z-index: 100;}
+        
+        /* 인트로 텍스트 스타일 */
+        #story-text {
+            font-size: 24px;
+            line-height: 1.6;
+            width: 80%;
+            max-width: 900px;
+            text-align: center;
+            word-break: keep-all; 
+            white-space: normal;
+        }
+
+        #lobby-screen h2, #upgrade-screen h2 { font-size: 48px; color: #4CAF50; margin-bottom: 40px; }
+        .lobby-menu { display: flex; justify-content: space-around; align-items: center; width: 100%; }
+        .upgrade-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; width: 90%; }
+        .upgrade-item { background-color: #333; padding: 20px; border-radius: 8px; border: 1px solid #555; }
+        .back-button { position: absolute; top: 20px; left: 20px; }
+        
+        .reset-button { background-color: #dc3545; border-color: #b22222; }
+        .reset-button:hover:not(:disabled) { background-color: #c9302c; }
+        .bottom-right-button { position: absolute; bottom: 20px; right: 20px; }
+
+        /* Game Screen Layout */
+        #game-play-wrapper { background-color: #3a3a3a; padding: 0; justify-content: flex-start; z-index: 5;}
+        #game-screen { width: 100%; height: calc(100% - 160px); position: relative; cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" style="font-size: 24px;"><text y="24" fill="yellow">⚔️</text></svg>') 16 16, auto; border-bottom: 3px solid #111; box-sizing: border-box; }
+        #action-bar { width: 100%; height: 160px; position: absolute; bottom: 0; left: 0; background-color: #2a2a2a; display: flex; justify-content: space-between; align-items: center; padding: 20px; box-sizing: border-box; }
+        #player-stats-bar { color: white; text-align: left; background: #222; padding: 15px; border-radius: 10px; border: 2px solid #555; width: 280px; }
+        #player-stats-bar h3 { margin: 0 0 10px 0; color: #4CAF50; }
+        #skills-bar { display: flex; gap: 15px; }
+        .skill-icon { width: 80px; height: 80px; background-color: #222; border: 2px solid #555; border-radius: 10px; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 18px; font-weight: bold; position: relative; overflow: hidden; }
+        .skill-key { font-size: 14px; position: absolute; bottom: 5px; right: 7px; color: #ccc; text-shadow: 1px 1px #000; }
+        .cooldown-overlay { position: absolute; bottom: 0; left: 0; width: 100%; background-color: rgba(0,0,0,0.8); transition: height 0.1s linear; }
+        #exit-game-container button { height: 80px; }
+        #boss-name-display { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); color: #fff; font-size: 28px; font-weight: bold; text-shadow: 2px 2px #000; z-index: 20; }
+
+        /* Stages & Entities */
+        .stage-boss { background-color: #222; background-image: radial-gradient(circle at center, #552222 10%, #222 70%); }
+        .stage-jasup { background-color: #e8dcb5; background-image: repeating-linear-gradient(45deg, #d3c4a3 25%, transparent 25%, transparent 75%, #d3c4a3 75%, #d3c4a3), repeating-linear-gradient(-45deg, #d3c4a3 25%, transparent 25%, transparent 75%, #d3c4a3 75%, #d3c4a3); background-size: 60px 60px; }
+        .stage-bokdo { background-color: #c0c0c0; background-image: linear-gradient(#d3d3d3 1px, transparent 1px), linear-gradient(90deg, #d3d3d3 1px, transparent 1px); background-size: 40px 40px; }
+        .stage-jeonggeom { background-color: #a0b0c0; background-image: radial-gradient(circle, #8899a9 10%, transparent 10%); background-size: 20px 20px; }
+        .stage-geupsik { background-color: #f5deb3; background-image: radial-gradient(#d2b48c 1px, transparent 1px); background-size: 15px 15px; }
+        .stage-ramen { background-color: #f0e68c; background-image: radial-gradient(#daa520 1px, transparent 1px); background-size: 10px 10px; }
+        
+        #player { width: 50px; height: 70px; position: absolute; display: flex; flex-direction: column; align-items: center; user-select: none; transition: box-shadow 0.3s; z-index: 15; }
+        .power-up-effect { box-shadow: 0 0 25px 10px #ffd700; border-radius: 50%; }
+        .player-head { width: 50px; height: 50px; background-color: #ffdbac; border: 2px solid #000; border-radius: 50%; position: relative; transition: transform 0.1s; }
+        .player-body { width: 30px; height: 20px; background-color: #007bff; border: 2px solid #000; border-bottom: none; }
+        #green-hat { width: 55px; height: 20px; background-color: #28a745; border: 2px solid #000; border-radius: 10px 10px 0 0; position: absolute; top: -10px; }
+        
+        /* 보스용 모자 스타일 */
+        .boss-hat { width: 100px; height: 35px; background-color: #28a745; border: 3px solid #000; border-radius: 15px 15px 0 0; position: absolute; top: -35px; left: 50%; transform: translateX(-50%); z-index: 20; }
+
+        #player-earmuffs { position: absolute; width: 100%; top: 15px; display: flex; justify-content: space-between; font-size: 20px; pointer-events: none; }
+        
+        .stunned { filter: grayscale(100%) blur(1px); animation: shake 0.5s infinite; }
+        .stone { filter: grayscale(100%) contrast(150%) brightness(0.7); pointer-events: none; }
+        @keyframes shake { 0% { transform: translate(0, 0) rotate(0deg); } 25% { transform: translate(-2px, 2px) rotate(-5deg); } 50% { transform: translate(0, 0) rotate(0deg); } 75% { transform: translate(2px, -2px) rotate(5deg); } 100% { transform: translate(0, 0) rotate(0deg); } }
+
+        .entity { position: absolute; display: flex; justify-content: center; align-items: center; font-size: 24px; text-align: center; }
+        .monster { width: 40px; height: 40px; border: 2px solid #5b2d00; background: #964B00; border-radius: 5px; }
+        .minion { width: 30px; height: 30px; border: 2px solid #444; background: #888; border-radius: 50%; }
+        .boss { color: white; font-weight: bold; text-shadow: 2px 2px #000; flex-direction: column; border-radius: 10px; transition: background-color 0.5s; z-index: 12;}
+        .summon-boss { border: 3px solid #ffd700; box-shadow: 0 0 10px yellow; z-index: 11; } 
+        
+        .projectile { width: 15px; height: 15px; background-color: #3498db; border-radius: 50%; }
+        .boss-projectile { background-color: rgba(255, 0, 0, 0.7); color: white; border-radius: 5px; white-space: nowrap; display: flex; justify-content: center; align-items: center; padding: 0 5px; font-size: 14px;}
+        .bubble-projectile { background-color: rgba(135, 206, 250, 0.6); border: 1px solid white; border-radius: 50%; color: white; font-size: 20px; }
+        .nep-projectile { background-color: #800080; color: #fff; font-weight: bold; border: 2px solid #fff; padding: 5px; border-radius: 5px; }
+        
+        .item { z-index: 5; }
+        .floating-text { position: absolute; z-index: 100; font-size: 24px; font-weight: bold; text-shadow: 2px 2px #000; animation: fade-out-up 1.5s forwards; user-select: none; }
+        @keyframes fade-out-up { to { opacity: 0; transform: translateY(-50px); } }
+
+        /* Health Bars */
+        .health-bar-bg { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 100%; height: 8px; background-color: #555; border-radius: 4px; border: 1px solid #000; }
+        .health-bar-fill { width: 100%; height: 100%; background-color: #dc3545; border-radius: 4px; transition: width 0.2s; }
+        .summon-hp { background-color: #ffaa00; }
+        
+        /* Melee Attack FX */
+        .melee-attack-fx { position: absolute; width: 240px; height: 240px; border: 4px solid rgba(255, 255, 255, 0.7); border-radius: 50%; transform: translate(-50%, -50%); animation: melee-fx 0.2s forwards; pointer-events: none; }
+        @keyframes melee-fx { from { opacity: 1; transform: translate(-50%, -50%) scale(0.5); } to { opacity: 0; transform: translate(-50%, -50%) scale(1); } }
+        
+        .center-message {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 48px;
+            font-weight: bold;
+            color: #ff4136;
+            text-shadow: 3px 3px #000;
+            z-index: 200;
+            pointer-events: none;
+            animation: fade-in-out 1.5s forwards;
+            white-space: pre-wrap;
+            text-align: center;
+        }
+        @keyframes fade-in-out {
+            0%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+            20%, 80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        }
+
+    </style>
+</head>
+<body>
+    <div id="game-wrapper">
+        <h1>빼앗긴 초록 모자를 찾아서</h1>
+        <div id="game-container">
+            <!-- All screens will be dynamically controlled by JS -->
+        </div>
+    </div>
+
+<script>
+const gameContainer = document.getElementById('game-container');
+let gameState = {}, gameIntervals = {}, keys = {}, gameActive = false;
+
+const GDD = {
+    STAGES: {
+        1: { name: "자습실", monster: { hp: 45, jjam: 25, gongbu: 12, speed: 1.2, dmg: 15, attackCooldown: 1500, emoji: '📖' }, class: "stage-jasup", maxOnScreen: 5 },
+        2: { name: "복도", monster: { hp: 70, jjam: 45, gongbu: 22, speed: 1.8, dmg: 20, attackCooldown: 1500, emoji: '📖' }, class: "stage-bokdo", maxOnScreen: 6 },
+        3: { name: "정검실", monster: { hp: 110, jjam: 70, gongbu: 38, speed: 1.6, dmg: 28, attackCooldown: 1200, emoji: '📖' }, class: "stage-jeonggeom", maxOnScreen: 7 },
+        4: { name: "급식실", monster: { hp: 160, jjam: 100, gongbu: 50, speed: 2.2, dmg: 38, attackCooldown: 1000, emoji: '📖' }, class: "stage-geupsik", maxOnScreen: 8 },
+        5: { name: "라면 파티", monster: { hp: 240, jjam: 150, gongbu: 70, speed: 2.5, dmg: 50, attackCooldown: 1000, emoji: '🍜' }, class: "stage-ramen", maxOnScreen: 12 },
+    },
+    BOSSES: {
+        'kangrae': { name: "김강래", hp: 1500, unlockLevel: 3, lyrics: [{t:'공부해라',b:false},{t:'아냐 너무 우-씅이야',b:true},{t:'성실해라',b:false},{t:'아냐 그러지못했잖아',b:true},{t:'사랑해라',b:false}] },
+        'uichan': { name: "이의찬", hp: 3000, unlockLevel: 6 },
+        'hyunhee': { name: "사감쌤", hp: 6500, unlockLevel: 9, 
+            attacks: [
+                { text: '너 벌점 5점이야', dmg: 40, w: 220 },
+                { text: '일로와', dmg: 35, w: 100 },
+                { text: '야!', dmg: 30, w: 60 }
+            ]
+        },
+        'yunjae': { name: "박윤재", hp: 10500, unlockLevel: 12 }, 
+        'minsang': { name: "구민상", hp: 15000, unlockLevel: 15 }, // HP 15,000
+    }
+};
+
+const TPL = {
+    screen: (id, content) => `<div id="${id}" class="screen">${content}</div>`,
+    lobbyButton: (id, text, className = 'lobby-button') => `<button id="${id}" class="${className}">${text}</button>`,
+    intro: () => TPL.screen('intro-screen', `<p id="story-text"></p><p style="margin-top: 40px; font-size: 18px; color: #888;">(F11을 눌러 전체 화면으로 플레이하는 것을 권장합니다)</p>${TPL.lobbyButton('intro-continue-button', '게임 시작', 'lobby-button hidden')}`),
+    lobby: () => TPL.screen('lobby-screen', `<h2>== 로비 ==</h2><div class="lobby-menu">${TPL.lobbyButton('goto-hunting-button', '사냥터')}${TPL.lobbyButton('goto-boss-button', '보스전')}${TPL.lobbyButton('goto-upgrade-button', '장비 강화')}</div><div id="selection-container"></div>${TPL.lobbyButton('reset-game-button', '처음부터', 'reset-button bottom-right-button')}`),
+    upgrade: () => TPL.screen('upgrade-screen', `<h2>== 장비 강화실 ==</h2><p>현재 공부량: <span id="gongbu-in-upgrade">0</span></p><div class="upgrade-grid">
+        <div class="upgrade-item"><h3>'축축' 공격 심화 연구</h3><p>현재 원거리 공격력: <span id="attack-stat"></span></p><button data-upgrade="attack"></button></div>
+        <div class="upgrade-item"><h3>아디다스 져지 개조</h3><p>현재 방어력: <span id="defense-stat"></span></p><button data-upgrade="defense"></button></div>
+        <div class="upgrade-item"><h3>뉴발란스 신발 분석</h3><p>현재 이동 속도: <span id="speed-stat"></span></p><button data-upgrade="speed"></button></div>
+        <div class="upgrade-item"><h3>필살기 연구</h3><p>현재: <span id="ultimate-stat"></span></p><button data-upgrade="ultimate"></button></div>
+        <div class="upgrade-item"><h3>짬-공부량 교환</h3><p>100짬을 100공부량으로 교환합니다.</p><p>현재 짬: <span id="jjam-amount-in-upgrade"></span></p><button data-upgrade="exchange-jjam"></button></div>
+        </div>${TPL.lobbyButton('back-to-lobby-btn', '로비로 돌아가기', 'back-button')}`),
+    game: () => TPL.screen('game-play-wrapper', `<div id="game-screen"><div id="boss-name-display"></div><div id="player"><div id="green-hat"></div><div class="player-head"><div id="player-earmuffs" class="hidden"><span>🎧</span><span>🎧</span></div></div><div class="player-body"></div></div></div>
+        <div id="action-bar">
+            <div id="player-stats-bar">
+                <h3>그의 정보</h3>
+                <div id="player-hp-text"></div>
+                <div id="level-text"></div>
+                <div id="jjam-text"></div>
+                <div id="gongbu-text"></div>
+            </div>
+            <div id="skills-bar">
+                <div class="skill-icon" id="skill-melee">씨발<div class="cooldown-overlay"></div><div class="skill-key">L-Click</div></div>
+                <div class="skill-icon" id="skill-q">축축<div class="cooldown-overlay"></div><div class="skill-key">Q</div></div>
+                <div class="skill-icon" id="skill-w">회복<div class="cooldown-overlay"></div><div class="skill-key">W</div></div>
+                <div class="skill-icon" id="skill-e">귀마개<div class="cooldown-overlay"></div><div class="skill-key">E</div></div>
+                <div class="skill-icon" id="skill-r">그르지마<div class="cooldown-overlay"></div><div class="skill-key">R</div></div>
+            </div>
+            <div id="exit-game-container">
+                <button id="exit-game-button" style="font-size:18px;">로비로</button>
+            </div>
+        </div>`),
+    gameOver: () => TPL.screen('game-over-screen', `<h2 id="game-over-message" style="color: #dc3545;"></h2><p>짬은 유지되지만, 공부량은 모두 잃었습니다.</p>${TPL.lobbyButton('game-over-to-lobby', '로비로 돌아가기')}`),
+    
+    // 엔딩 화면 수정: 텍스트 변경, 캐릭터 2배 확대, 처음부터 버튼 추가
+    gameWon: () => TPL.screen('game-won-screen', `
+        <h2 style="color: #4CAF50; font-size: 48px; margin-bottom: 20px;">승리!</h2>
+        <p style="font-size: 24px; margin-bottom: 40px;">그가 초록 모자를 되찾았다!</p>
+        <div id="player-victory" style="position: relative; margin: 0 auto 50px auto; width: 50px; height: 70px; transform: scale(2);"></div>
+        <div style="display: flex; gap: 20px; justify-content: center;">
+            ${TPL.lobbyButton('game-won-to-lobby', '로비로 돌아가기')}
+            ${TPL.lobbyButton('game-won-reset', '처음부터 다시 시작하기', 'reset-button')}
+        </div>
+    `),
+    
+    bossCleared: () => TPL.screen('boss-cleared-screen', `<h2 id="boss-clear-message" style="color: #4CAF50; font-size: 40px;"></h2><p>보스를 처치하고 짬과 명성을 얻었습니다!</p>${TPL.lobbyButton('boss-clear-to-lobby', '로비로 복귀', 'lobby-button')}`),
+};
+
+function getJjamForLevel(level) {
+    return 100 + (level - 1) * 50;
+}
+
+function saveGameState() {
+    try {
+        const saveData = {
+            player: { ...gameState.player },
+            progress: gameState.progress,
+            upgrades: gameState.upgrades
+        };
+        localStorage.setItem('woosseungRPG_save', JSON.stringify(saveData));
+    } catch (error) { console.error("Save failed:", error); }
+}
+
+function loadGameState() {
+    const savedDataJSON = localStorage.getItem('woosseungRPG_save');
+    if (savedDataJSON) {
+        try {
+            const savedData = JSON.parse(savedDataJSON);
+            const p = gameState.player;
+            const savedP = savedData.player;
+            p.maxHp = savedP.maxHp; p.attack = savedP.attack; p.defense = savedP.defense;
+            p.speed = savedP.speed; p.level = savedP.level; p.jjam = savedP.jjam;
+            p.jjamToNextLevel = savedP.jjamToNextLevel || getJjamForLevel(savedP.level);
+            p.gongbu = savedP.gongbu; p.hp = savedP.hp !== undefined ? savedP.hp : p.maxHp;
+            p.skills.melee.damage = savedP.skills.melee.damage;
+            gameState.progress = savedData.progress;
+            gameState.upgrades = savedData.upgrades;
+        } catch (error) { console.error("Load failed:", error); }
+    }
+}
+
+function resetGame() {
+    localStorage.removeItem('woosseungRPG_save');
+    location.reload();
+}
+
+function init() {
+    gameState = {
+        player: {
+            x: 450, y: 300, w: 50, h: 70, speed: 3, targetX: 450, targetY: 300,
+            hp: 100, maxHp: 100, attack: 10, defense: 0,
+            level: 1, jjam: 0, jjamToNextLevel: 100, gongbu: 0, isInvincible: false, isPoweredUp: false, moveLockedUntil: 0,
+            skills: {
+                melee: { lastUsed: 0, cooldown: 180, damage: 5 }, 
+                q: { lastUsed: 0, cooldown: 270 }, 
+                w: { lastUsed: 0, cooldown: 30000 },
+                e: { lastUsed: 0, cooldown: 35000, active: false },
+                r: { lastUsed: 0, cooldown: 20000 },
+            }
+        },
+        progress: { unlockedStage: 1, defeatedBosses: [] },
+        upgrades: {
+            attack: { cost: 50 }, defense: { cost: 80 }, speed: { cost: 100 },
+            ultimate: { cost: 200, level: 1 }
+        },
+        activeGame: { entities: [] }
+    };
+    loadGameState(); 
+    renderAllScreens();
+    runIntro();
+}
+
+function renderAllScreens() {
+    gameContainer.innerHTML = TPL.intro() + TPL.lobby() + TPL.upgrade() + TPL.game() + TPL.gameOver() + TPL.gameWon() + TPL.bossCleared();
+    showScreen('intro-screen');
+}
+
+function showScreen(screenId) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+    document.getElementById(screenId).classList.remove('hidden');
+    if (screenId === 'lobby-screen') updateLobbyUI();
+    if (screenId === 'upgrade-screen') updateUpgradeUI();
+    
+    // 해피 엔딩 연출
+    if (screenId === 'game-won-screen') {
+        const vic = document.getElementById('player-victory');
+        vic.innerHTML = document.getElementById('player').innerHTML;
+        const hat = vic.querySelector('#green-hat');
+        if(hat) hat.style.display = 'block'; 
+        
+        const head = vic.querySelector('.player-head');
+        const earmuffs = head.querySelector('#player-earmuffs');
+        if(earmuffs) earmuffs.remove();
+        
+        const face = document.createElement('div');
+        face.innerHTML = "^ ‿ ^";
+        face.style.position = "absolute";
+        face.style.top = "18px";
+        face.style.width = "100%";
+        face.style.textAlign = "center";
+        face.style.color = "#333";
+        face.style.fontWeight = "bold";
+        face.style.fontSize = "18px";
+        head.appendChild(face);
+    }
+}
+
+function runIntro() {
+    const story = "언제나 유쾌하고 모두의 친구가 그의 상징과도 같은 '초록 모자'를 최종 보스 '구민상'에게 빼앗기고 말았다! 자신의 아이덴티티인 초록 모자를 되찾기 위해, 험난한 여정을 시작한다...";
+    const storyTextEl = document.getElementById('story-text');
+    storyTextEl.innerHTML = "";
+    let i = 0;
+    const typing = setInterval(() => {
+        if (i < story.length) {
+            storyTextEl.innerHTML += story.charAt(i++) + (i === story.length ? '<span class="blinking-cursor">_</span>' : '');
+        } else {
+            clearInterval(typing);
+            document.getElementById('intro-continue-button').classList.remove('hidden');
+        }
+    }, 50);
+}
+
+function updateLobbyUI() {
+    document.getElementById('green-hat').style.display = gameState.progress.defeatedBosses.includes('minsang') ? 'block' : 'none';
+    document.getElementById('selection-container').innerHTML = '';
+}
+
+function showSelection(type) {
+    const container = document.getElementById('selection-container');
+    let content = '';
+    if (type === 'hunting') {
+        content = `<h3>-- 사냥터 선택 --</h3><div class="selection-menu">`;
+        for (const id in GDD.STAGES) {
+            const stage = GDD.STAGES[id];
+            const disabled = id > gameState.progress.unlockedStage ? 'disabled' : '';
+            content += `<button data-type="hunting" data-id="${id}" ${disabled}>${id}. ${stage.name}</button>`;
+        }
+        content += `</div>`;
+    } else if (type === 'boss') {
+        content = `<h3>-- 보스전 선택 --</h3><div class="selection-menu">`;
+        const bossIds = Object.keys(GDD.BOSSES);
+        for (let i = 0; i < bossIds.length; i++) {
+            const id = bossIds[i];
+            const boss = GDD.BOSSES[id];
+            
+            // 조건 1: 레벨
+            const levelMet = gameState.player.level >= boss.unlockLevel;
+            
+            // 조건 2: 이전 보스 처치 여부
+            let prevBossDefeated = true;
+            if (i > 0) {
+                const prevBossId = bossIds[i-1];
+                if (!gameState.progress.defeatedBosses.includes(prevBossId)) {
+                    prevBossDefeated = false;
+                }
+            }
+
+            // 조건 3: 이미 처치했는지
+            const defeated = gameState.progress.defeatedBosses.includes(id);
+
+            // 비활성화 조건: 레벨 부족 OR 이전 보스 안 잡음 OR 이미 잡음
+            const disabled = !levelMet || !prevBossDefeated || defeated ? 'disabled' : '';
+            const defeatedText = defeated ? '(완료) ' : '';
+            
+            let reqText = '';
+            if (defeated) {
+                 // 이미 잡았으면 추가 텍스트 없음
+            } else if (!prevBossDefeated) {
+                reqText = `<br><span style="font-size: 14px; color: #ff6b6b;">(이전 보스 처치 필요)</span>`;
+            } else if (!levelMet) {
+                reqText = `<br><span style="font-size: 14px;">(짬 레벨 ${boss.unlockLevel} 이상)</span>`;
+            }
+
+            content += `<button data-type="boss" data-id="${id}" ${disabled}>${defeatedText}${boss.name}${reqText}</button>`;
+        }
+        content += `</div>`;
+    }
+    container.innerHTML = content;
+}
+
+function updateUpgradeUI() {
+    const p = gameState.player;
+    const up = gameState.upgrades;
+    document.querySelector('#gongbu-in-upgrade').textContent = p.gongbu;
+    document.querySelector('#attack-stat').textContent = p.attack;
+    document.querySelector('#defense-stat').textContent = p.defense;
+    document.querySelector('#speed-stat').textContent = p.speed.toFixed(1);
+    const ultiText = up.ultimate.level === 1 ? "그르지마~" : "제발 그르지마~";
+    document.querySelector('#ultimate-stat').textContent = ultiText;
+    
+    const btns = ['attack', 'defense', 'speed', 'ultimate'];
+    btns.forEach(stat => {
+        const btn = document.querySelector(`[data-upgrade="${stat}"]`);
+        if (stat === 'ultimate' && up.ultimate.level >= 2) {
+            btn.textContent = '최고 레벨'; btn.disabled = true;
+        } else {
+            btn.textContent = `강화 (비용: ${up[stat].cost})`;
+            btn.disabled = p.gongbu < up[stat].cost;
+        }
+    });
+    document.querySelector('#jjam-amount-in-upgrade').textContent = p.jjam;
+    const exchangeBtn = document.querySelector('[data-upgrade="exchange-jjam"]');
+    exchangeBtn.textContent = '교환하기 (100 짬 -> 100 공부량)';
+    exchangeBtn.disabled = p.jjam < 100;
+}
+
+function handleUpgrade(stat) {
+    const p = gameState.player;
+    if (stat === 'exchange-jjam') {
+        if (p.jjam >= 100) { p.jjam -= 100; p.gongbu += 100; updateUpgradeUI(); saveGameState(); }
+    } else {
+        const up = gameState.upgrades[stat];
+        if (p.gongbu >= up.cost) {
+            p.gongbu -= up.cost;
+            up.cost = Math.floor(up.cost * 1.8);
+            if (stat === 'attack') { p.attack += 5; p.skills.melee.damage += 2; }
+            if (stat === 'defense') p.defense += 2;
+            if (stat === 'speed') p.speed += 0.5;
+            if (stat === 'ultimate') up.level++;
+            updateUpgradeUI(); saveGameState();
+        }
+    }
+}
+
+function startGame(type, id) {
+    Object.values(gameIntervals).forEach(clearInterval);
+    gameIntervals = {};
+    gameActive = true;
+    gameState.activeGame = { entities: [], type, id };
+    const p = gameState.player;
+    p.isPoweredUp = false; p.moveLockedUntil = 0;
+    document.getElementById('player').classList.remove('power-up-effect');
+    document.getElementById('player').classList.remove('stone'); // 스톤 상태 초기화
+
+    const gameScreen = document.getElementById('game-screen');
+    const gameRect = gameScreen.getBoundingClientRect();
+    p.x = gameRect.width / 2 - p.w / 2; p.y = gameRect.height / 2 - p.h / 2;
+    p.targetX = p.x; p.targetY = p.y;
+
+    document.querySelectorAll('.entity-instance').forEach(e => e.remove());
+    document.getElementById('boss-name-display').textContent = '';
+    
+    // Hide Exit Button if Boss Mode
+    const exitBtnContainer = document.getElementById('exit-game-container');
+    if (type === 'boss') {
+        exitBtnContainer.style.display = 'none';
+    } else {
+        exitBtnContainer.style.display = 'block';
+    }
+
+    if (type === 'hunting') {
+        const stageData = GDD.STAGES[id];
+        gameScreen.className = stageData.class;
+        gameIntervals.spawn = setInterval(() => {
+            if (!gameActive) return;
+            const monsterCount = gameState.activeGame.entities.filter(e => e.type === 'monster').length;
+            if (monsterCount < stageData.maxOnScreen) spawnMonster(id);
+        }, 1500); 
+    } else {
+        gameScreen.className = 'stage-boss';
+        spawnBoss(id);
+    }
+    showScreen('game-play-wrapper');
+    gameIntervals.loop = requestAnimationFrame(gameLoop);
+}
+
+function endGame(isWin, message) {
+    gameActive = false;
+    cancelAnimationFrame(gameIntervals.loop);
+    Object.values(gameIntervals).forEach(clearInterval);
+    gameIntervals = {};
+    
+    // 몬스터/보스들의 인터벌도 모두 정리
+    if(gameState.activeGame && gameState.activeGame.entities) {
+        gameState.activeGame.entities.forEach(e => {
+            if(e.intervals) e.intervals.forEach(clearInterval);
+        });
+    }
+
+    if (isWin) {
+        const { type, id } = gameState.activeGame;
+        if (type === 'boss') {
+            if (!gameState.progress.defeatedBosses.includes(id)) {
+                gameState.progress.defeatedBosses.push(id);
+            }
+            const bossIndex = Object.keys(GDD.BOSSES).indexOf(id);
+            gameState.progress.unlockedStage = Math.max(gameState.progress.unlockedStage, bossIndex + 2);
+            saveGameState();
+            
+            if (id === 'minsang') { 
+                showScreen('game-won-screen'); 
+                return; 
+            } else {
+                // Show Boss Cleared Screen instead of Lobby
+                document.getElementById('boss-clear-message').textContent = `${GDD.BOSSES[id].name} 격파!`;
+                showScreen('boss-cleared-screen');
+                return;
+            }
+        }
+        saveGameState(); showScreen('lobby-screen');
+    } else {
+        gameState.player.gongbu = 0;
+        gameState.player.hp = Math.ceil(gameState.player.maxHp / 2);
+        saveGameState();
+        document.getElementById('game-over-message').textContent = message;
+        showScreen('game-over-screen');
+    }
+}
+
+function createEntity(options) {
+    const healthBarHtml = (['monster', 'boss', 'minion'].includes(options.type)) ? `<div class="health-bar-bg"><div class="health-bar-fill ${options.isSummon ? 'summon-hp' : ''}"></div></div>` : '';
+    const el = document.createElement('div');
+    el.className = `entity entity-instance ${options.class || ''}`;
+    el.innerHTML = healthBarHtml + (options.html || '');
+    el.style.width = `${options.w}px`;
+    el.style.height = `${options.h}px`;
+    const entity = { ...options, el };
+    gameState.activeGame.entities.push(entity);
+    document.getElementById('game-screen').appendChild(el);
+    return entity;
+}
+
+function spawnMonster(stageId) {
+    const mData = GDD.STAGES[stageId].monster;
+    const gameRect = document.getElementById('game-screen').getBoundingClientRect();
+    let x, y;
+    if (Math.random() < 0.5) { x = Math.random() < 0.5 ? -40 : gameRect.width; y = Math.random() * gameRect.height; } 
+    else { y = Math.random() < 0.5 ? -40 : gameRect.height; x = Math.random() * gameRect.width; }
+    createEntity({ type: 'monster', hp: mData.hp, maxHp: mData.hp, jjam: mData.jjam, gongbu: mData.gongbu, dmg: mData.dmg,
+        x, y, w: 40, h: 40, speed: mData.speed, lastAttackTime: 0, attackCooldown: mData.attackCooldown, class: 'monster', html: mData.emoji
+    });
+}
+
+function spawnMinion(bossX, bossY) {
+    showFloatingText("따까리 소환!", {x: bossX, y: bossY, w:0}, "orange");
+    createEntity({ type: 'minion', hp: 50, maxHp: 50, dmg: 8, x: bossX, y: bossY, w: 30, h: 30, speed: 4, lastAttackTime: 0, attackCooldown: 800, class: 'minion', html: '💪' });
+}
+
+function spawnBoss(bossId, isSummon = false) {
+    const bData = GDD.BOSSES[bossId];
+    const gameRect = document.getElementById('game-screen').getBoundingClientRect();
+    let w, h, speed, bgColor;
+
+    if (bossId === 'uichan') { w = 70; h = 70; speed = 1.0; bgColor = '#800080';}
+    else if (bossId === 'hyunhee') { w = 220; h = 220; speed = 0.5; bgColor = '#444';}
+    else if (bossId === 'yunjae') { w = 150; h = 150; speed = 2.2; bgColor = '#D2691E';} 
+    else if (bossId === 'minsang') { w = 90; h = 90; speed = 1.5; bgColor = '#000';}
+    else { w = 60; h = 60; speed = 0; bgColor = '#ff4136';}
+    
+    // 소환된 보스는 크기를 좀 더 작게
+    if (isSummon) { w *= 0.8; h *= 0.8; }
+
+    // 소환된 보스 체력 2배로 상향 (0.2 -> 0.4)
+    let hp = isSummon ? bData.hp * 0.4 : bData.hp; 
+
+    // 보스 소환 위치 조정 (구민상 이름과 겹치지 않게)
+    let spawnY = 50;
+    if (bossId === 'minsang') spawnY = 50; 
+    else if (isSummon) spawnY = 150; // 소환된 보스는 훨씬 아래에 배치
+    else spawnY = 50;
+
+    let options = { type: 'boss', id: bossId, hp: hp, maxHp: hp, 
+        x: gameRect.width / 2 - w / 2, y: spawnY, w, h, speed,
+        class: isSummon ? 'boss summon-boss' : 'boss', html: '', isSummon: isSummon
+    };
+    
+    if (bossId === 'uichan') options.dmg = 15;
+    if (bossId === 'hyunhee') { options.dmg = 20; options.enrageLevel = 0; }
+    if (bossId === 'yunjae') {
+        options.isDashing = false; options.hasFiredFirstAttack = false;
+        options.lastSummonTime = Date.now(); options.lastMeleeAttack = 0;
+    }
+    if (bossId === 'minsang') {
+        options.summonQueue = ['kangrae', 'uichan', 'hyunhee', 'yunjae'];
+        // NEP 쿨타임 7초. 바로 쏘지 않고 4초 정도 여유를 주기 위해 (7000 - 4000) = 3000만큼 미리 깎아둠 (실제 4초 후 발사)
+        options.lastNep = Date.now() - 3000; 
+        // 식기세척기 쿨타임 5초. 3초 후 발사되게 설정
+        options.lastDishwasher = Date.now() - 2000;
+        // 미니 몸 소환 타이머 초기화
+        options.lastMiniSummon = 0;
+        // 구민상은 초록 모자를 쓰고 나옴
+        options.html = '<div class="boss-hat"></div>';
+    }
+
+    const bossEntity = createEntity(options);
+    bossEntity.el.style.backgroundColor = bgColor;
+    bossEntity.intervals = [];
+
+    if (!isSummon) {
+        document.getElementById('boss-name-display').textContent = bData.name;
+        gameState.activeGame.boss = bossEntity;
+    }
+
+    // 소환된 따까리 보스는 환경 기믹(음식 생성, 책 생성 등)을 발동하지 않도록 변경
+    if (bossId === 'uichan' && !isSummon) {
+        const int = setInterval(() => {
+            if (!gameActive) return;
+            if (!bossEntity.el.parentNode) { clearInterval(int); return; } 
+            const foodCount = gameState.activeGame.entities.filter(e => e.type === 'food').length;
+            if (foodCount < 7) spawnItem('food');
+        }, 6000);
+        bossEntity.intervals.push(int);
+    }
+    if (bossId === 'hyunhee' && !isSummon) {
+        const int1 = setInterval(() => { 
+            if(!gameActive) return; 
+            if(!bossEntity.el.parentNode) { clearInterval(int1); return; }
+            if(gameState.activeGame.entities.filter(e=>e.type==='book').length<1) spawnItem('book'); 
+        }, 24000);
+        const int2 = setInterval(() => { 
+            if(!gameActive) return; 
+            if(!bossEntity.el.parentNode) { clearInterval(int2); return; }
+            if(gameState.activeGame.entities.filter(e=>e.type==='ramen').length<9) spawnItem('ramen'); 
+        }, 5000);
+        bossEntity.intervals.push(int1, int2);
+    }
+    if (bossId === 'yunjae' && !isSummon) {
+        const int3 = setInterval(() => {
+            if (gameActive) {
+                if(!bossEntity.el.parentNode) { clearInterval(int3); return; }
+                if (gameState.activeGame.entities.filter(e => e.type === 'shake').length < 2) spawnItem('shake');
+            }
+        }, 20000);
+        bossEntity.intervals.push(int3);
+    }
+}
+
+function spawnItem(type) {
+    const gameRect = document.getElementById('game-screen').getBoundingClientRect();
+    const options = { x: Math.random() * (gameRect.width - 40), y: Math.random() * (gameRect.height - 40), w: 40, h: 40, class: 'item' };
+    if (type === 'book') Object.assign(options, { type: 'book', html: '📕' });
+    if (type === 'shake') Object.assign(options, { type: 'shake', html: '🥤' });
+    if (type === 'food') Object.assign(options, { type: 'food', html: '🍲' });
+    if (type === 'ramen') Object.assign(options, { type: 'ramen', html: '🍜' });
+    createEntity(options);
+}
+
+function useSkill(key) {
+    const now = Date.now();
+    const p = gameState.player;
+    if (p.moveLockedUntil > now) return; 
+    const skill = p.skills[key];
+    if (now - skill.lastUsed < skill.cooldown) return;
+    skill.lastUsed = now;
+    switch(key) {
+        case 'q':
+            const mouseX = keys.mouseX, mouseY = keys.mouseY;
+            const angle = Math.atan2(mouseY - (p.y + p.h/2), mouseX - (p.x + p.w/2));
+            let qDamage = p.attack; if (p.isPoweredUp) qDamage *= 2;
+            createEntity({ type: "projectile", subtype: "player", dmg: qDamage, x: p.x + p.w/2 - 7.5, y: p.y + p.h/2 - 7.5, w: 15, h: 15, dx: Math.cos(angle) * 10, dy: Math.sin(angle) * 10, class: "projectile" });
+            break;
+        case 'w':
+            const healAmount = Math.floor(p.maxHp * 0.3);
+            p.hp = Math.min(p.maxHp, p.hp + healAmount);
+            showFloatingText(`+${healAmount}`, p, 'lime');
+            break;
+        case 'e':
+            skill.active = true;
+            document.getElementById('player-earmuffs').classList.remove('hidden');
+            showFloatingText("귀마개!", p, 'lightblue');
+            setTimeout(() => { skill.active = false; document.getElementById('player-earmuffs').classList.add('hidden'); }, 5000);
+            break;
+        case 'r':
+            const ulti = gameState.upgrades.ultimate;
+            const isUpgraded = ulti.level > 1;
+            showFloatingText(isUpgraded ? "제발 그르지마~" : "그르지마~", p, 'yellow');
+            gameState.activeGame.entities.forEach(e => {
+                if (['monster', 'boss', 'minion'].includes(e.type)) e.stunnedUntil = Date.now() + (isUpgraded ? 5000 : 3000);
+            });
+            break;
+    }
+}
+
+function playerMeleeAttack() {
+    const now = Date.now();
+    const p = gameState.player;
+    if (p.moveLockedUntil > now) return;
+    const skill = p.skills.melee;
+    if (now - skill.lastUsed < skill.cooldown) return;
+    skill.lastUsed = now;
+
+    const meleeRange = 120;
+    const attackFX = document.createElement('div');
+    attackFX.className = 'melee-attack-fx';
+    attackFX.style.left = `${p.x + p.w / 2}px`;
+    attackFX.style.top = `${p.y + p.h / 2}px`;
+    document.getElementById('game-screen').appendChild(attackFX);
+    setTimeout(() => attackFX.remove(), 200);
+
+    let meleeDamage = skill.damage; if (p.isPoweredUp) meleeDamage *= 2;
+    gameState.activeGame.entities.forEach(e => {
+        if (['monster', 'boss', 'minion'].includes(e.type)) {
+            const dist = Math.hypot((p.x + p.w/2) - (e.x + e.w/2), (p.y + p.h/2) - (e.y + e.h/2));
+            if (dist < meleeRange) {
+                e.hp -= meleeDamage;
+                showFloatingText(`-${meleeDamage}`, e, '#fff');
+                if (e.hp <= 0) handleDeath(e);
+            }
+        }
+    });
+}
+
+function takeDamage(amount) {
+    const p = gameState.player;
+    if (p.isPoweredUp) { showFloatingText("무적!", p, 'gold'); return; }
+    if (p.skills.e.active) { showFloatingText("막음!", p, 'lightblue'); return; }
+    if (p.isInvincible || p.hp <= 0) return;
+    
+    p.isInvincible = true;
+    setTimeout(() => p.isInvincible = false, 500);
+    
+    const damageTaken = Math.max(1, amount - p.defense);
+    p.hp -= damageTaken;
+    showFloatingText(`-${damageTaken}`, p, 'red');
+    if (p.hp <= 0) { p.hp = 0; endGame(false, "그가 쓰러졌다..."); }
+}
+
+function handleDeath(entity) {
+    if (entity.type === 'monster') {
+        const p = gameState.player;
+        p.jjam += entity.jjam; p.gongbu += entity.gongbu;
+        
+        showFloatingText(`+${entity.jjam} 짬`, entity, 'orange');
+        setTimeout(() => {
+            showFloatingText(`+${entity.gongbu} 공부`, entity, 'skyblue');
+        }, 300);
+
+        // 레벨 15 미만일 때만 레벨업 진행
+        if (p.level < 15) {
+            while (p.jjam >= p.jjamToNextLevel && p.level < 15) {
+                const hpIncrease = 20;
+                p.jjam -= p.jjamToNextLevel; 
+                p.level++;
+                if (p.level < 15) {
+                    p.jjamToNextLevel = getJjamForLevel(p.level);
+                } else {
+                    p.jjamToNextLevel = 0; // 표기용
+                }
+                p.maxHp += hpIncrease; p.hp = Math.min(p.maxHp, p.hp + hpIncrease);
+            }
+        }
+    } else if (entity.type === 'boss') {
+        if (entity.isSummon) {
+            showCenterScreenMessage(`${GDD.BOSSES[entity.id].name} 퇴치!`, 1000);
+        } else {
+            endGame(true);
+        }
+    }
+}
+
+function gameLoop() {
+    if (!gameActive) return;
+    const p = gameState.player;
+    const now = Date.now();
+    const gameScreen = document.getElementById('game-screen');
+    const playerEl = document.getElementById('player');
+    
+    if (p.moveLockedUntil > now) {
+        // 돌 상태라면 돌 클래스 추가, 아니면 기절 클래스
+        if (playerEl.classList.contains('stone')) {
+            // 이미 돌 상태면 유지
+        } else {
+             if (!playerEl.classList.contains('stunned')) playerEl.classList.add('stunned');
+        }
+    } else {
+        playerEl.classList.remove('stunned');
+        playerEl.classList.remove('stone'); // 락 풀리면 돌 상태도 해제
+        
+        const dist = Math.hypot(p.targetX - p.x, p.targetY - p.y);
+        if (dist > p.speed) {
+            const angle = Math.atan2(p.targetY - p.y, p.targetX - p.x);
+            p.x += Math.cos(angle) * p.speed;
+            p.y += Math.sin(angle) * p.speed;
+        }
+    }
+    p.x = Math.max(0, Math.min(gameScreen.clientWidth - p.w, p.x));
+    p.y = Math.max(0, Math.min(gameScreen.clientHeight - p.h, p.y));
+    
+    const playerHead = playerEl.querySelector('.player-head');
+    if (keys.mouseX < p.x + p.w / 2) playerHead.style.transform = 'scaleX(-1)'; else playerHead.style.transform = 'scaleX(1)';
+    playerEl.style.transform = `translate(${p.x}px, ${p.y}px)`;
+
+    const entities = gameState.activeGame.entities;
+    for (let i = entities.length - 1; i >= 0; i--) {
+        const e = entities[i];
+        let remove = false;
+        if (e.stunnedUntil && now > e.stunnedUntil) e.stunnedUntil = null;
+        if (e.stunnedUntil) { e.el.style.filter = 'brightness(0.7)'; }
+        else {
+            e.el.style.filter = '';
+            switch(e.type) {
+                case 'monster':
+                case 'minion':
+                    const angle = Math.atan2((p.y + p.h/2) - (e.y + e.h/2), (p.x + p.w/2) - (e.x + e.w/2));
+                    e.x += Math.cos(angle) * e.speed; e.y += Math.sin(angle) * e.speed;
+                    if (isColliding(p, e) && now - e.lastAttackTime > e.attackCooldown) {
+                        e.lastAttackTime = now; takeDamage(e.dmg);
+                    }
+                    break;
+                case 'projectile':
+                    e.x += e.dx; e.y += e.dy;
+                    if (e.x < -100 || e.x > gameScreen.clientWidth + 100 || e.y < -100 || e.y > gameScreen.clientHeight + 100) remove = true;
+                    if (e.subtype === 'player') {
+                        entities.forEach(target => {
+                            if (!remove && (['monster', 'boss', 'minion'].includes(target.type)) && isColliding(e, target)) {
+                                target.hp -= e.dmg; showFloatingText(`-${e.dmg}`, target, '#ff9900');
+                                if (target.hp <= 0) handleDeath(target);
+                                remove = true;
+                            }
+                        });
+                    } else if (e.subtype === 'boss' && isColliding(p, e)) {
+                        takeDamage(e.dmg);
+                        if (e.special === 'nep') {
+                            p.moveLockedUntil = now + 2500;
+                            playerEl.classList.add('stone'); // 시각적 효과 추가
+                            showFloatingText("억!! 짬처리 당했다!! (석화)", p, "gray");
+                        }
+                        remove = true;
+                    }
+                    break;
+                case 'boss':
+                    bossLogic(e);
+                    if (isColliding(p, e) && (['uichan', 'hyunhee', 'minsang'].includes(e.id)) && !e.isDashing) takeDamage(e.dmg || 20);
+                    break;
+                case 'book':
+                    if (isColliding(p, e)) {
+                        p.isPoweredUp = true; playerEl.classList.add('power-up-effect');
+                        showCenterScreenMessage("현희 몰래 공부했다! 그가 강해졌다!", 2000);
+                        setTimeout(() => { p.isPoweredUp = false; playerEl.classList.remove('power-up-effect'); }, 10000);
+                        remove = true;
+                    }
+                    break;
+                case 'shake':
+                    if (isColliding(p, e)) {
+                        const yunjae = entities.find(ent => ent.id === 'yunjae');
+                        if (yunjae) {
+                            yunjae.weakenedUntil = now + 5000;
+                            showCenterScreenMessage("우-씅이 단백질 쉐이크를 뺏었다!", 2000);
+                        }
+                        remove = true;
+                    }
+                    break;
+                case 'food':
+                    if (isColliding(p, e)) {
+                        const uichan = entities.find(ent => ent.id === 'uichan');
+                        if(uichan) {
+                            uichan.speed += 1.0; uichan.dmg += 10;
+                            showCenterScreenMessage("우씅이 급식을 흘려서 이의찬이 화가 났다!", 2000);
+                        }
+                        remove = true;
+                    }
+                    break;
+                case 'ramen':
+                    if (isColliding(p, e)) {
+                        const hyunhee = entities.find(ent => ent.id === 'hyunhee');
+                        if(hyunhee) {
+                            if (hyunhee.enrageLevel === 0) {
+                                hyunhee.speed *= 2.0; hyunhee.dmg *= 1.5; hyunhee.el.style.backgroundColor = '#b22222';
+                                showCenterScreenMessage("라면을 들켜 현희가 화났다!", 2000);
+                            } else {
+                                hyunhee.speed += 0.3; hyunhee.dmg += 10;
+                                showCenterScreenMessage("현희가 더 화났다!!", 1500);
+                            }
+                            hyunhee.enrageLevel++;
+                        }
+                        remove = true;
+                    }
+                    break;
+            }
+        }
+        if (remove || e.hp <= 0) {
+            if(e.intervals) e.intervals.forEach(clearInterval);
+            e.el.remove(); 
+            entities.splice(i, 1); 
+        }
+        else {
+             e.el.style.transform = `translate(${e.x}px, ${e.y}px)`;
+             if (['monster', 'boss', 'minion'].includes(e.type)) updateHealthBar(e);
+        }
+    }
+    
+    updateGameUI();
+    gameIntervals.loop = requestAnimationFrame(gameLoop);
+}
+
+function updateHealthBar(entity) {
+    const fill = entity.el.querySelector('.health-bar-fill');
+    if (fill) fill.style.width = `${(entity.hp / entity.maxHp) * 100}%`;
+}
+
+function updateGameUI() {
+    const p = gameState.player;
+    document.getElementById('player-hp-text').innerHTML = `❤️ 체력: ${Math.ceil(p.hp)} / ${p.maxHp}`;
+    document.getElementById('level-text').innerHTML = `🌟 짬 레벨: ${p.level}`;
+    
+    if (p.level >= 15) {
+        document.getElementById('jjam-text').innerHTML = `📈 짬: ${p.jjam} (MAX)`;
+    } else {
+        document.getElementById('jjam-text').innerHTML = `📈 짬: ${p.jjam} / ${p.jjamToNextLevel}`;
+    }
+    document.getElementById('gongbu-text').innerHTML = `📚 공부량: ${p.gongbu}`;
+    
+    const now = Date.now();
+    for (const key in p.skills) {
+        const skill = p.skills[key];
+        const overlay = document.querySelector(`#skill-${key} .cooldown-overlay`);
+        const remaining = skill.cooldown - (now - skill.lastUsed);
+        if (overlay) overlay.style.height = remaining > 0 ? `${(remaining / skill.cooldown) * 100}%` : '0%';
+    }
+}
+
+function isColliding(a, b) { return !( ((a.y + a.h) < (b.y)) || (a.y > (b.y + b.h)) || ((a.x + a.w) < (b.x)) || (a.x > (b.x + b.w)) ); }
+
+function showFloatingText(text, entity, color){
+    const el = document.createElement('div');
+    el.className = 'floating-text';
+    el.textContent = text;
+    el.style.color = color;
+    el.style.left = `${entity.x + entity.w/2}px`;
+    el.style.top = `${entity.y}px`;
+    document.getElementById('game-screen').appendChild(el);
+    setTimeout(() => el.remove(), 1000);
+}
+
+function showCenterScreenMessage(text, duration, callback) {
+    const el = document.createElement('div');
+    el.className = 'center-message';
+    el.textContent = text;
+    document.getElementById('game-screen').appendChild(el);
+    setTimeout(() => {
+        el.remove();
+        if (callback) callback();
+    }, duration);
+}
+
+function bossLogic(b) {
+    if (!gameActive) return;
+    if(!b.lastAttack) b.lastAttack = 0;
+    const now = Date.now();
+    const p = gameState.player;
+    
+    // 구민상 보스 패턴
+    if (b.id === 'minsang') {
+        const angle = Math.atan2(p.y - b.y, p.x - b.x);
+        b.x += Math.cos(angle) * b.speed * 0.5; b.y += Math.sin(angle) * b.speed * 0.5;
+
+        // 소환 패턴
+        const activeSummon = gameState.activeGame.entities.find(e => e.isSummon);
+        if (!activeSummon && b.summonQueue.length > 0) {
+            const nextBoss = b.summonQueue.shift();
+            showCenterScreenMessage(`구민상이 ${GDD.BOSSES[nextBoss].name}을(를) 소환했다!`, 2000);
+            spawnBoss(nextBoss, true);
+        } else if (!activeSummon && b.summonQueue.length === 0) {
+             // 1대1 상황: 미니 몸 소환 패턴 (12초마다) - 간격 늘림
+             if (!b.lastMiniSummon) b.lastMiniSummon = 0;
+             if (now - b.lastMiniSummon > 12000) {
+                 b.lastMiniSummon = now;
+                 showFloatingText("미니 몸 소환!", b, "gray");
+                 for(let i=0; i<3; i++) {
+                     spawnMinion(b.x + (Math.random()*100 - 50), b.y + (Math.random()*100 - 50));
+                 }
+             }
+        }
+
+        // NEP 쿨타임
+        if (now - b.lastNep > 7000) {
+            b.lastNep = now;
+            showFloatingText("NEP 짬처리!!", b, "purple");
+            createEntity({ type: 'projectile', subtype: 'boss', special: 'nep', dmg: 25, x: b.x + b.w/2, y: b.y + b.h/2, w: 100, h: 40, dx: Math.cos(angle) * 9, dy: Math.sin(angle) * 9, class: 'nep-projectile', html: 'NEP 짬처리!' });
+        }
+
+        // 식기세척기 쿨타임
+        if (now - b.lastDishwasher > 5000) {
+            b.lastDishwasher = now;
+            showFloatingText("두루고 식기세척기 가동!", b, "skyblue");
+            for(let i=0; i<8; i++) {
+                const bubbleAngle = (Math.PI * 2 / 8) * i + (Math.random() * 0.5);
+                createEntity({ type: 'projectile', subtype: 'boss', dmg: 15, x: b.x + b.w/2, y: b.y + b.h/2, w: 30, h: 30, dx: Math.cos(bubbleAngle) * 5, dy: Math.sin(bubbleAngle) * 5, class: 'bubble-projectile', html: '🫧' });
+            }
+        }
+
+        if (now - b.lastAttack > 2000) { 
+            createEntity({ type: 'projectile', subtype: 'boss', dmg: 25, x: b.x + b.w/2, y: b.y + b.h/2, w: 80, h: 24, dx: Math.cos(angle) * 7, dy: Math.sin(angle) * 7, class: 'boss-projectile', html: '우씅임' }); 
+            b.lastAttack = now; 
+        }
+        return; 
+    }
+
+    switch(b.id) {
+        case 'kangrae': 
+            if (now - b.lastAttack > 1500) { 
+                const lyric = GDD.BOSSES.kangrae.lyrics[Math.floor(Math.random() * GDD.BOSSES.kangrae.lyrics.length)]; 
+                const angle = Math.atan2(p.y - b.y, p.x - b.x); 
+                createEntity({ 
+                    type: 'projectile', subtype: 'boss', dmg: lyric.b ? 30 : 10, 
+                    x: b.x + b.w/2, y: b.y + b.h, w: lyric.t.length * 18, h: 30,
+                    dx: Math.cos(angle) * 4, dy: Math.sin(angle) * 4, class: 'boss-projectile', html: lyric.t 
+                }); 
+                b.lastAttack = now; 
+            } 
+            break;
+        case 'uichan':
+            const angle_u = Math.atan2((p.y + p.h/2) - (b.y + b.h/2), (p.x + p.w/2) - (b.x + b.w/2)); 
+            b.x += Math.cos(angle_u) * b.speed; b.y += Math.sin(angle_u) * b.speed; 
+            break;
+        case 'hyunhee': 
+            const angle_h = Math.atan2((p.y + p.h/2) - (b.y + b.h/2), (p.x + p.w/2) - (b.x + b.w/2)); 
+            b.x += Math.cos(angle_h) * b.speed; b.y += Math.sin(angle_h) * b.speed; 
+            if (now - b.lastAttack > (b.enrageLevel > 0 ? 1500 : 3000)) {
+                const attack = GDD.BOSSES.hyunhee.attacks[Math.floor(Math.random() * GDD.BOSSES.hyunhee.attacks.length)];
+                const angle = Math.atan2(p.y - b.y, p.x - b.x); 
+                createEntity({ type: 'projectile', subtype: 'boss', dmg: b.dmg, 
+                    x: b.x + b.w/2, y: b.y + b.h/2, w: attack.w, h: 30, 
+                    dx: Math.cos(angle) * 2, dy: Math.sin(angle) * 2, class: 'boss-projectile', html: attack.text }); 
+                b.lastAttack = now; 
+            } 
+            break;
+        case 'yunjae':
+            if (b.weakenedUntil && now < b.weakenedUntil) { b.speed = 1.0; } else { b.speed = 2.2; }
+            // 소환된 박윤재는 미니언 소환 안함
+            if (!b.isSummon && now - b.lastSummonTime > 25000) { spawnMinion(b.x, b.y); b.lastSummonTime = now; }
+            if (b.isDashing) {
+                if (now > b.dashEndTime) b.isDashing = false;
+                else {
+                    b.x += Math.cos(b.dashAngle) * b.speed * 3.5; b.y += Math.sin(b.dashAngle) * b.speed * 3.5;
+                    if (isColliding(p, b)) takeDamage(32);
+                }
+            } else {
+                const angle_y = Math.atan2(p.y - b.y, p.x - b.x);
+                b.x += Math.cos(angle_y) * b.speed; b.y += Math.sin(angle_y) * b.speed;
+            }
+            const dist = Math.hypot(p.x - b.x, p.y - b.y);
+            if (dist < 160 && now - b.lastMeleeAttack > 2000 && !b.isDashing) {
+                showFloatingText("휘둘!", b, 'white'); takeDamage(24); b.lastMeleeAttack = now; b.lastAttack = now; return;
+            }
+            if (now - b.lastAttack > 3000 && !b.isDashing) {
+                b.lastAttack = now;
+                const damage = b.weakenedUntil ? 15 : 28;
+                const baseAngle = Math.atan2(p.y - b.y, p.x - b.x);
+                if (Math.random() < 0.6) { 
+                    for (let i = 0; i < 5; i++) {
+                        const spreadAngle = baseAngle + (i - 2) * 0.25;
+                        createEntity({ type: 'projectile', subtype: 'boss', dmg: damage, x: b.x + b.w/2, y: b.y + b.h/2, w: 90, h: 24, dx: Math.cos(spreadAngle) * 7, dy: Math.sin(spreadAngle) * 7, class: 'boss-projectile', html: '우씅임' });
+                    }
+                } else { 
+                    showFloatingText("!", b, "red");
+                    b.isDashing = true; b.dashEndTime = now + 600; b.dashAngle = baseAngle;
+                }
+            }
+            break;
+    }
+}
+
+document.addEventListener('click', e => {
+    const target = e.target;
+    if (!gameActive) {
+        if (target.id === 'intro-continue-button') showScreen('lobby-screen');
+        else if (target.id === 'goto-hunting-button') showSelection('hunting');
+        else if (target.id === 'goto-boss-button') showSelection('boss');
+        else if (target.id === 'goto-upgrade-button') showScreen('upgrade-screen');
+        else if (target.id === 'back-to-lobby-btn') showScreen('lobby-screen');
+        else if (target.id === 'reset-game-button') {
+            if (confirm("정말로 모든 진행 상황을 초기화하시겠습니까?")) resetGame();
+        }
+        else if (target.dataset.type) startGame(target.dataset.type, target.dataset.id);
+        else if (target.dataset.upgrade) handleUpgrade(target.dataset.upgrade);
+        else if (target.id === 'game-over-to-lobby' || target.id === 'game-won-to-lobby' || target.id === 'boss-clear-to-lobby') showScreen('lobby-screen');
+        // 엔딩 화면의 리셋 버튼 처리 추가
+        else if (target.id === 'game-won-reset') {
+            if (confirm("정말로 데이터를 초기화하고 처음부터 시작하시겠습니까?")) resetGame();
+        }
+    } else {
+        if (target.id === 'exit-game-button') {
+            gameActive = false;
+            cancelAnimationFrame(gameIntervals.loop);
+            Object.values(gameIntervals).forEach(clearInterval);
+            gameIntervals = {};
+            
+            // 보스나 몬스터들의 interval도 정리해줘야 함
+            if(gameState.activeGame && gameState.activeGame.entities) {
+                gameState.activeGame.entities.forEach(e => {
+                    if(e.intervals) e.intervals.forEach(clearInterval);
+                });
+            }
+
+            gameState.player.hp = gameState.player.maxHp;
+            saveGameState(); 
+            
+            showScreen('lobby-screen');
+        }
+        else if (document.getElementById('game-screen').contains(target)) {
+            playerMeleeAttack();
+        }
+    }
+});
+document.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    if (gameActive) {
+        const gameRect = document.getElementById('game-screen').getBoundingClientRect();
+        gameState.player.targetX = e.clientX - gameRect.left - gameState.player.w / 2;
+        gameState.player.targetY = e.clientY - gameRect.top - gameState.player.h / 2;
+    }
+});
+document.addEventListener('mousemove', e => {
+    const gameRect = document.getElementById('game-screen').getBoundingClientRect();
+    if(gameRect) {
+        keys.mouseX = e.clientX - gameRect.left;
+        keys.mouseY = e.clientY - gameRect.top;
+    }
+});
+window.addEventListener('keydown', e => {
+    const key = e.key.toLowerCase();
+    keys[key] = true;
+    if (gameActive && ['q', 'w', 'e', 'r'].includes(key)) {
+        e.preventDefault();
+        useSkill(key);
+    }
+});
+window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+init();
+
+</script>
+</body>
+</html>
