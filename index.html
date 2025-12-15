@@ -64,9 +64,14 @@
         
         #player { width: 50px; height: 70px; position: absolute; display: flex; flex-direction: column; align-items: center; user-select: none; transition: box-shadow 0.3s; z-index: 15; }
         .power-up-effect { box-shadow: 0 0 25px 10px #ffd700; border-radius: 50%; }
-        .player-head { width: 50px; height: 50px; background-color: #ffdbac; border: 2px solid #000; border-radius: 50%; position: relative; transition: transform 0.1s; }
-        .player-body { width: 30px; height: 20px; background-color: #007bff; border: 2px solid #000; border-bottom: none; }
-        #green-hat { width: 55px; height: 20px; background-color: #28a745; border: 2px solid #000; border-radius: 10px 10px 0 0; position: absolute; top: -10px; }
+        
+        /* [수정] 머리: z-index 5 */
+        .player-head { width: 50px; height: 50px; background-color: #ffdbac; border: 2px solid #000; border-radius: 50%; position: relative; transition: transform 0.1s; z-index: 5; }
+        
+        .player-body { width: 30px; height: 20px; background-color: #007bff; border: 2px solid #000; border-bottom: none; z-index: 4; }
+        
+        /* [수정] 모자: z-index 20 (머리보다 앞으로) */
+        #green-hat { width: 55px; height: 20px; background-color: #28a745; border: 2px solid #000; border-radius: 10px 10px 0 0; position: absolute; top: -10px; z-index: 20; }
         
         /* 보스용 모자 스타일 */
         .boss-hat { width: 100px; height: 35px; background-color: #28a745; border: 3px solid #000; border-radius: 15px 15px 0 0; position: absolute; top: -35px; left: 50%; transform: translateX(-50%); z-index: 20; }
@@ -119,6 +124,39 @@
         @keyframes fade-in-out {
             0%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
             20%, 80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        }
+
+        /* [NEW] 엔딩 화면 추가 스타일 */
+        @keyframes victory-jump {
+            0%, 100% { transform: scale(2.5) translateY(0); }
+            50% { transform: scale(2.5) translateY(-15px); }
+        }
+
+        .victory-animate {
+            animation: victory-jump 1s infinite ease-in-out;
+        }
+
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #f00;
+            animation: confetti-fall linear forwards;
+            opacity: 0;
+            z-index: 1;
+        }
+
+        @keyframes confetti-fall {
+            0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+
+        #player-victory {
+            /* [수정] 마진 확보 (글자 가림 방지) */
+            margin: 100px auto 100px auto; 
+            box-shadow: 0 0 50px rgba(76, 175, 80, 0.5); 
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.1);
         }
 
     </style>
@@ -192,14 +230,19 @@ const TPL = {
         </div>`),
     gameOver: () => TPL.screen('game-over-screen', `<h2 id="game-over-message" style="color: #dc3545;"></h2><p>짬은 유지되지만, 공부량은 모두 잃었습니다.</p>${TPL.lobbyButton('game-over-to-lobby', '로비로 돌아가기')}`),
     
-    // 엔딩 화면 수정: 텍스트 변경, 캐릭터 2배 확대, 처음부터 버튼 추가
+    // [NEW] 엔딩 화면: 폭죽 컨테이너, 레이아웃 개선
     gameWon: () => TPL.screen('game-won-screen', `
-        <h2 style="color: #4CAF50; font-size: 48px; margin-bottom: 20px;">승리!</h2>
-        <p style="font-size: 24px; margin-bottom: 40px;">그가 초록 모자를 되찾았다!</p>
-        <div id="player-victory" style="position: relative; margin: 0 auto 50px auto; width: 50px; height: 70px; transform: scale(2);"></div>
-        <div style="display: flex; gap: 20px; justify-content: center;">
-            ${TPL.lobbyButton('game-won-to-lobby', '로비로 돌아가기')}
-            ${TPL.lobbyButton('game-won-reset', '처음부터 다시 시작하기', 'reset-button')}
+        <div id="confetti-container" style="position: absolute; top:0; left:0; width:100%; height:100%; overflow:hidden; pointer-events:none; z-index: 1;"></div>
+        <div style="position: relative; z-index: 10; width: 100%; display:flex; flex-direction:column; align-items:center;">
+            <h2 style="color: #4CAF50; font-size: 60px; margin-bottom: 20px; text-shadow: 0 0 10px #fff;">🎉 작전 성공! 🎉</h2>
+            <p style="font-size: 24px; margin-bottom: 20px; line-height: 1.5; color: #ddd;">
+                마침내 구민상을 물리치고,<br>그의 상징인 <strong>'초록 모자'</strong>를 되찾았습니다!<br>이제 그는 다시 행복해질 것입니다.
+            </p>
+            <div id="player-victory" style="position: relative; width: 50px; height: 70px; transform: scale(2.5);"></div>
+            <div style="display: flex; gap: 20px; justify-content: center; margin-top: 20px;">
+                ${TPL.lobbyButton('game-won-to-lobby', '로비로 돌아가기')}
+                ${TPL.lobbyButton('game-won-reset', '처음부터 다시 시작하기', 'reset-button')}
+            </div>
         </div>
     `),
     
@@ -281,27 +324,62 @@ function showScreen(screenId) {
     if (screenId === 'lobby-screen') updateLobbyUI();
     if (screenId === 'upgrade-screen') updateUpgradeUI();
     
-    // 해피 엔딩 연출
+    // [NEW] 해피 엔딩 연출 개선
     if (screenId === 'game-won-screen') {
         const vic = document.getElementById('player-victory');
+        // 플레이어 모습 복사
         vic.innerHTML = document.getElementById('player').innerHTML;
-        const hat = vic.querySelector('#green-hat');
-        if(hat) hat.style.display = 'block'; 
+        vic.classList.add('victory-animate'); // 점프 애니메이션 추가
         
+        // 모자 강제 착용, 빛나는 효과, [수정] z-index 맨 앞으로
+        const hat = vic.querySelector('#green-hat');
+        if(hat) {
+            hat.style.display = 'block'; 
+            hat.style.boxShadow = "0 0 15px #4CAF50"; 
+            hat.style.zIndex = "30"; 
+        }
+
         const head = vic.querySelector('.player-head');
+        
+        // [수정] 머리 회전 초기화 (뒤집혀서 나올 수 있음)
+        head.style.transform = "scaleX(1)";
+
+        // 귀마개 제거
         const earmuffs = head.querySelector('#player-earmuffs');
         if(earmuffs) earmuffs.remove();
         
+        // 행복한 표정 그리기 (^ ▽ ^)
         const face = document.createElement('div');
-        face.innerHTML = "^ ‿ ^";
+        face.innerHTML = "^ ▽ ^";
         face.style.position = "absolute";
-        face.style.top = "18px";
+        face.style.top = "50%";
+        face.style.left = "50%";
+        face.style.transform = "translate(-50%, -50%)"; // 정중앙 정렬
         face.style.width = "100%";
         face.style.textAlign = "center";
         face.style.color = "#333";
         face.style.fontWeight = "bold";
-        face.style.fontSize = "18px";
+        face.style.fontSize = "16px";
+        face.style.whiteSpace = "nowrap"; // [수정] 줄바꿈 방지
         head.appendChild(face);
+
+        // 폭죽 효과 생성
+        const createConfetti = () => {
+            const colors = ['#f00', '#0f0', '#00f', '#ff0', '#0ff', '#f0f'];
+            const container = document.getElementById('confetti-container');
+            container.innerHTML = ''; 
+
+            for (let i = 0; i < 150; i++) {
+                const conf = document.createElement('div');
+                conf.className = 'confetti';
+                conf.style.left = Math.random() * 100 + '%';
+                conf.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                conf.style.animationDuration = (Math.random() * 3 + 2) + 's';
+                conf.style.animationDelay = (Math.random() * 2) + 's';
+                container.appendChild(conf);
+            }
+        };
+        createConfetti();
     }
 }
 
